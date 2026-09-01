@@ -45,7 +45,7 @@ export function NotifyScreen({
             <ListRow.Texts
               type="2RowTypeA"
               top={
-                slot.code === "caffeine-level-pm1500-p" ? (
+                slot.label === "오후 3시" ? (
                   <>
                     {slot.label}{" "}
                     <Badge size="xsmall" color="blue" variant="weak">

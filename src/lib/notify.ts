@@ -8,14 +8,15 @@ import { isInTossApp } from "./tossEnv";
 
 export type NotifyConsent = "newAgreement" | "alreadyAgreed" | "agreementRejected";
 
+// 콘솔에서 발급받은 실제 templateCode(미니앱 ID 71799). 슬롯별 termsId: 119328/119329/119335.
 export const SLOTS = [
-  { code: "caffeine-level-pm1300-p", label: "오후 1시", body: "점심에 마신 커피, 기록하셨어요?" },
+  { code: "STD_71799_119328_PARTNER", label: "오후 1시", body: "점심에 마신 커피, 기록하셨어요?" },
   {
-    code: "caffeine-level-pm1500-p",
+    code: "STD_71799_119329_PARTNER",
     label: "오후 3시",
     body: "지금 마시면 취침 때 얼마나 남을지 확인해보세요",
   },
-  { code: "caffeine-level-pm2030-p", label: "오후 8시 30분", body: "자기 전, 오늘 남은 카페인을 확인해보세요" },
+  { code: "STD_71799_119335_PARTNER", label: "오후 8시 30분", body: "자기 전, 오늘 남은 카페인을 확인해보세요" },
 ] as const;
 
 export type SlotCode = (typeof SLOTS)[number]["code"];
