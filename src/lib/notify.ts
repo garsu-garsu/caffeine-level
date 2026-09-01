@@ -9,14 +9,16 @@ import { isInTossApp } from "./tossEnv";
 export type NotifyConsent = "newAgreement" | "alreadyAgreed" | "agreementRejected";
 
 // 콘솔에서 발급받은 실제 templateCode(미니앱 ID 71799). 슬롯별 termsId: 119328/119329/119335.
+// 문구는 푸시 콘솔 규격(제목≤7자·내용≤25자·"요."로 종결) 확정본(마케팅.md §3) — D안과 같은 의미,
+// 규격만 맞췄다. 오후 3시 이동 URL이 intoss://caffeine-level/sim이라 App.tsx의 경로 판별과 직결된다.
 export const SLOTS = [
-  { code: "STD_71799_119328_PARTNER", label: "오후 1시", body: "점심에 마신 커피, 기록하셨어요?" },
+  { code: "STD_71799_119328_PARTNER", label: "오후 1시", body: "점심에 마신 커피, 지금 기록해요." },
   {
     code: "STD_71799_119329_PARTNER",
     label: "오후 3시",
-    body: "지금 마시면 취침 때 얼마나 남을지 확인해보세요",
+    body: "지금 마시면 취침 때 얼마나 남을지 확인해요.",
   },
-  { code: "STD_71799_119335_PARTNER", label: "오후 8시 30분", body: "자기 전, 오늘 남은 카페인을 확인해보세요" },
+  { code: "STD_71799_119335_PARTNER", label: "오후 8시 30분", body: "자기 전, 오늘 남은 카페인을 확인해요." },
 ] as const;
 
 export type SlotCode = (typeof SLOTS)[number]["code"];
