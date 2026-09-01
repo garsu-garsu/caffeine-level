@@ -120,12 +120,13 @@ for (let i = 1; i < finePoints.length - 1; i += 1) {
 }
 assert.equal(turns, 1, "#9 단조 구간이 tmax에서 한 번만 뒤집힘");
 
-// #10 프리셋 — 개수 + 11개 전수 대조(§12.1 확정값). 1차·2차 심사에서 연속으로 사고가 난 자리다.
-assert.equal(Object.keys(PRESETS).length, 11, "#10 프리셋은 11개(캔커피 포함, 심사-2차.md A-5 확정)");
+// #10 프리셋 — 개수 + 12개 전수 대조(§12.1/14차 확정값). 1·2차 연속 사고 자리라 개수·값·note 셋 다 건다.
+assert.equal(Object.keys(PRESETS).length, 12, "#10 프리셋은 12개(14차: 대용량 아메리카노 추가)");
 const PRESET_EXPECTED_MG: Record<keyof typeof PRESETS, number> = {
   espresso: 75,
   americano_tall: 150,
   americano_grande: 225,
+  americano_xl: 300,
   instant_mix: 50,
   cold_brew: 200,
   energy_250: 60,
@@ -140,8 +141,10 @@ for (const [key, mg] of Object.entries(PRESET_EXPECTED_MG)) {
 }
 assert.equal(PRESETS.americano_tall.mg, PRESETS.espresso.mg * 2, "#10 아메리카노 톨 = 에스프레소 × 2");
 assert.equal(PRESETS.americano_grande.mg, PRESETS.espresso.mg * 3, "#10 그란데 = 에스프레소 × 3");
-// M-10: 콜드브루 편차 병기(§8-25)가 상수에서 지워지면 여기서 잡힌다.
+assert.equal(PRESETS.americano_xl.mg, PRESETS.espresso.mg * 4, "#10 대용량 = 에스프레소 × 4");
+// M-10/14차: 편차가 큰 프리셋의 note가 상수에서 조용히 빠지는 게 이 자리의 실제 재발 유형이다(§8-25).
 assert.ok(PRESETS.cold_brew.note, "#10 콜드브루는 편차 큼 문구를 병기해야 한다(§8-25)");
+assert.ok(PRESETS.americano_xl.note, "#10 대용량 아메리카노는 편차 큼 문구를 병기해야 한다(§8-25)");
 assert.equal(PRESETS.tonic.label, "자양강장제", "#10 tonic 화면 라벨은 브랜드명이 아닌 '자양강장제'");
 
 // #11 체중 경계값 — A-10. 화면이 아니라 계산 함수 진입부에서 막는다.

@@ -35,11 +35,12 @@ export interface PresetInfo {
   note?: string;
 }
 
-/** §12.1 확정 — 커피전문점 샷 수 기반 + 식약처/브랜드 공개값. 심사-2차.md A-5: 11개 확정(캔커피 포함). */
+/** §12.1 확정 — 커피전문점 샷 수 기반 + 식약처/브랜드 공개값. 12개(14차: 대용량 1종 추가). */
 export const PRESETS = {
   espresso: { mg: 75, label: "에스프레소 1샷" },
   americano_tall: { mg: 150, label: "아메리카노 톨" },
   americano_grande: { mg: 225, label: "아메리카노 그란데" },
+  americano_xl: { mg: 300, label: "대용량 아메리카노", note: "브랜드·용량별 편차 큼(200~470mg)" },
   instant_mix: { mg: 50, label: "인스턴트 믹스" },
   cold_brew: { mg: 200, label: "콜드브루", note: "제품별 편차 큼(116~404mg)" },
   energy_250: { mg: 60, label: "에너지드링크 250ml" },

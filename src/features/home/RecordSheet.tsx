@@ -44,7 +44,9 @@ export function RecordSheet({
         onClose();
       }}
     >
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, padding: "8px 0" }}>
+      {/* 시트 좌우 패딩 20px — 헤더(TDS 기본 여백)와 그리드가 같은 좌측 기준선을 쓰게 한다(§2 13차). */}
+      <div style={{ padding: "0 20px 16px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
         {(Object.entries(PRESETS) as [keyof typeof PRESETS, PresetInfo][]).map(
           ([key, preset]) => (
             <button
@@ -78,7 +80,7 @@ export function RecordSheet({
         )}
       </div>
 
-      <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, marginTop: 20 }}>
         <div style={{ flex: 1 }}>
           <TextField.Clearable
             variant="box"
@@ -150,6 +152,7 @@ export function RecordSheet({
           ))}
         </div>
       )}
+      </div>
     </BottomSheet>
   );
 }
