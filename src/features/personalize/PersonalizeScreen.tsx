@@ -7,19 +7,24 @@ import { EVENT, track } from "../../lib/analytics";
 import { ScreenScroll } from "../../components/ScreenLayout";
 import { palette } from "../../theme";
 
-/** 내 몸에 맞추기(§3) — 체중/흡연/경구피임약 3개. 성별·나이 입력 없음. */
+/** 내 몸에 맞추기(§3) — 체중/흡연/경구피임약/취침 시각 4개. 성별·나이 입력 없음. */
 export function PersonalizeScreen({
   profile,
+  bedtime,
   onApply,
+  onApplyBedtime,
   onBack,
 }: {
   profile: Profile;
+  bedtime: string;
   onApply: (profile: Profile) => void;
+  onApplyBedtime: (bedtime: string) => void;
   onBack: () => void;
 }) {
   const [weightText, setWeightText] = useState(String(profile.weightKg));
   const [smoker, setSmoker] = useState(profile.smoker);
   const [oc, setOc] = useState(profile.oc);
+  const [bedtimeText, setBedtimeText] = useState(bedtime);
 
   const weightNum = Number(weightText);
   const weightValid = Number.isFinite(weightNum) && weightNum >= 30 && weightNum <= 200;
@@ -32,6 +37,10 @@ export function PersonalizeScreen({
     if (oc) fields.push("oc");
     track(EVENT.personalizeSaved, { fields: fields.join(",") });
     onApply({ weightKg: weightValid ? weightNum : profile.weightKg, smoker, oc });
+    if (bedtimeText !== bedtime) {
+      track(EVENT.bedtimeAdjusted, { to: bedtimeText });
+      onApplyBedtime(bedtimeText);
+    }
     onBack();
   };
 
@@ -72,6 +81,21 @@ export function PersonalizeScreen({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
           <span style={{ fontSize: 16, color: palette.ink }}>경구피임약(에스트로겐 함유)을 복용 중이에요</span>
           <Switch checked={oc} onChange={(e) => setOc(e.target.checked)} />
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <span style={{ fontSize: 16, color: palette.ink }}>취침 시각</span>
+          {/* TDS에 시간 입력 컴포넌트가 없어 네이티브로 간다(§3 12차 재판정) — "HH:MM"을 그대로 주고받아
+              입력·저장·표시 어디에도 변환 코드가 없다. min>max는 자정 넘김 순환 범위로 해석된다. */}
+          <input
+            type="time"
+            min="21:00"
+            max="02:00"
+            step={1800}
+            value={bedtimeText}
+            onChange={(e) => setBedtimeText(e.target.value)}
+            style={{ fontSize: 16, padding: "8px 12px", border: `1px solid ${adaptive.grey200}`, borderRadius: 8 }}
+          />
         </div>
 
         <div>

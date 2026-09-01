@@ -6,6 +6,7 @@ import type { Drink, Profile } from "./caffeine";
 const DRINKS_KEY = "cl.v1.drinks";
 const PROFILE_KEY = "cl.v1.profile";
 const NOTIFY_KEY = "cl.v1.notify";
+const BEDTIME_KEY = "cl.v1.bedtime";
 
 export interface NotifyState {
   agreed: string[];
@@ -68,4 +69,13 @@ export function loadNotify(): NotifyState {
 
 export function saveNotify(state: NotifyState): void {
   save(NOTIFY_KEY, state);
+}
+
+/** "HH:MM", 기본 "23:00"(§12.3). 정규화는 저장이 아니라 bedtimeMsOf() 진입부에서 한다. */
+export function loadBedtime(): string {
+  return load(BEDTIME_KEY, "23:00");
+}
+
+export function saveBedtime(bedtime: string): void {
+  save(BEDTIME_KEY, bedtime);
 }

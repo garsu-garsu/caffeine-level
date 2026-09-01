@@ -18,6 +18,8 @@ export interface CurveChartProps {
   simPoints?: CurvePoint[] | null;
   nowMs: number;
   bedtimeMs: number;
+  /** "HH:MM" — 사용자가 설정한 취침 시각(기본 "23:00"). 라벨 리터럴에 절대 하드코딩하지 않는다. */
+  bedtime: string;
   /** 봉우리 강조 점(§6) — 마신 시각들 */
   drinkAtTimes: number[];
   fromMs: number;
@@ -37,6 +39,7 @@ export function CurveChart({
   simPoints,
   nowMs,
   bedtimeMs,
+  bedtime,
   drinkAtTimes,
   fromMs,
   toMs,
@@ -159,12 +162,12 @@ export function CurveChart({
               fontSize={11}
               fill="#8B8478"
             >
-              🌙 {bedtimeWord} 23:00
+              🌙 {bedtimeWord} {bedtime}
             </text>
           </>
         ) : (
           <text x={RIGHT} y={TOP - 6} textAnchor="end" fontSize={11} fill="#8B8478">
-            {bedtimeWord} 23:00 →
+            {bedtimeWord} {bedtime} →
           </text>
         )}
       </svg>

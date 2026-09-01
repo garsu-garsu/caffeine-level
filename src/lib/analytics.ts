@@ -37,6 +37,7 @@ export const EVENT = {
   notifyConsentAgreed: "notify_consent_agreed", // { slot }
   personalizeOpened: "personalize_opened",
   personalizeSaved: "personalize_saved", // { fields }
+  bedtimeAdjusted: "bedtime_adjusted", // { to }
   simOpened: "sim_opened", // { entry: toggle | notification }
   simPreviewed: "sim_previewed", // { preset }
   simToLog: "sim_to_log", // { preset }

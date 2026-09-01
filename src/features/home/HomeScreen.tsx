@@ -41,6 +41,7 @@ export function HomeScreen({
   drinks,
   profile,
   notify,
+  bedtime,
   now,
   notificationEntry,
   onAddDrink,
@@ -51,6 +52,7 @@ export function HomeScreen({
   drinks: Drink[];
   profile: Profile;
   notify: NotifyState;
+  bedtime: string;
   now: number;
   notificationEntry: boolean;
   onAddDrink: (drink: Drink) => void;
@@ -70,7 +72,7 @@ export function HomeScreen({
 
   const currentConc = concentrationMgL(drinks, profile, now);
   const currentRemain = remainingMg(currentConc, profile.weightKg);
-  const bedtimeMs = bedtimeMsOf(now);
+  const bedtimeMs = bedtimeMsOf(now, bedtime);
   const bedtimeIsTomorrow = toKstDateKey(bedtimeMs) !== toKstDateKey(now);
   // curvePoints로 통일(check-core.ts #12가 실제·시뮬 양쪽을 이 경로로 검증한다 — N-8).
   const bedtimeConc = curvePoints(drinks, profile, bedtimeMs, bedtimeMs, 1)[0].mgL;
@@ -171,6 +173,7 @@ export function HomeScreen({
             simPoints={simPoints}
             nowMs={now}
             bedtimeMs={bedtimeMs}
+            bedtime={bedtime}
             drinkAtTimes={drinks.map((d) => d.at)}
             fromMs={from}
             toMs={to}
@@ -221,7 +224,7 @@ export function HomeScreen({
 
         <div style={{ margin: "16px 0" }}>
           <p style={{ margin: 0, fontSize: 15, color: palette.ink }}>
-            🌙 {bedtimeIsTomorrow ? "내일 " : ""}취침(23:00) 예상 {formatMgL(bedtimeConc)} mg/L (약 {Math.round(bedtimeRemain)}mg)
+            🌙 {bedtimeIsTomorrow ? "내일 " : ""}취침({bedtime}) 예상 {formatMgL(bedtimeConc)} mg/L (약 {Math.round(bedtimeRemain)}mg)
           </p>
           {simOn && simBedtimeConc != null && simBedtimeRemain != null && (
             <p style={{ margin: "4px 0 0", fontSize: 15, color: palette.ink }}>

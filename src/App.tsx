@@ -8,7 +8,17 @@ import { GuideScreen } from "./features/guide/GuideScreen";
 import { useNow } from "./hooks/useNow";
 import { EVENT, track, trackScreen } from "./lib/analytics";
 import type { Drink, Profile } from "./lib/caffeine";
-import { addDrink, loadDrinks, loadNotify, loadProfile, removeDrink, saveNotify, saveProfile } from "./lib/storage";
+import {
+  addDrink,
+  loadBedtime,
+  loadDrinks,
+  loadNotify,
+  loadProfile,
+  removeDrink,
+  saveBedtime,
+  saveNotify,
+  saveProfile,
+} from "./lib/storage";
 import type { NotifyState } from "./lib/storage";
 import { isInTossApp } from "./lib/tossEnv";
 
@@ -42,6 +52,7 @@ export default function App() {
   const [drinks, setDrinks] = useState<Drink[]>(() => loadDrinks(Date.now()));
   const [profile, setProfile] = useState<Profile>(() => loadProfile());
   const [notify, setNotify] = useState<NotifyState>(() => loadNotify());
+  const [bedtime, setBedtime] = useState<string>(() => loadBedtime());
   // 첫 렌더 전에 확정해야 HomeScreen의 useState(notificationEntry) 초기값이 이 값을 받는다 —
   // useEffect/useRef로 늦게 채우면 리렌더가 안 일어나 시뮬 토글이 영원히 안 켜진다(R-1).
   const [entry] = useState<string>(detectEntry);
@@ -77,6 +88,7 @@ export default function App() {
           drinks={drinks}
           profile={profile}
           notify={notify}
+          bedtime={bedtime}
           now={now}
           notificationEntry={entry === "notification"}
           onAddDrink={(drink) => setDrinks((prev) => addDrink(prev, drink))}
@@ -94,9 +106,14 @@ export default function App() {
       {current === "personalize" && (
         <PersonalizeScreen
           profile={profile}
+          bedtime={bedtime}
           onApply={(next) => {
             saveProfile(next);
             setProfile(next);
+          }}
+          onApplyBedtime={(next) => {
+            saveBedtime(next);
+            setBedtime(next);
           }}
           onBack={goHome}
         />

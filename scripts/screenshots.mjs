@@ -60,7 +60,9 @@ async function installPageOverrides(page, fixedMs) {
   await page.addInitScript(() => {
     document.addEventListener("DOMContentLoaded", () => {
       const style = document.createElement("style");
-      style.textContent = ".ait-panel-root { display: none !important; }";
+      // [data-ait-slot-id]: 광고 ID가 실제 값이면 devtools가 "[@apps-in-toss/devtools] Banner Ad"
+      // 목업 박스를 배너 자리에 그린다 — 실기기/스토어 화면엔 없는 디버그 표시라 같이 숨긴다.
+      style.textContent = ".ait-panel-root, [data-ait-slot-id] { display: none !important; }";
       document.head.appendChild(style);
     });
   });

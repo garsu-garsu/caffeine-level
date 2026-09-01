@@ -177,26 +177,39 @@ assert.ok(
   `#12 시뮬레이션 취침값(${simBedtime})은 실제 취침값(${realBedtime}) × 2 초과여야 한다 — 섭취 시각이 달라 정확히 2배는 구조적으로 불가능하다("2배" 지름길이면 여기서 깨진다)`,
 );
 
-/* #13 — §12.8 신설(취침 경과 (b)안). 하루 어긋나면 화면값이 조용히 24배 틀린다. */
+/* #13 — §12.8 일반화(취침 시각 사용자 조정, 11차). 하루 어긋나면 화면값이 조용히 24배 틀린다.
+ * 규칙은 시각과 무관하게 하나다 — UI가 21:00~02:00으로 범위를 좁혀도 이 assert는 늘리지 않는다. */
 assert.equal(
-  bedtimeMsOf(Date.parse("2026-09-01T13:59:00Z")), // 22:59 KST
+  bedtimeMsOf(Date.parse("2026-09-01T13:59:00Z"), "23:00"), // 22:59 KST
   Date.parse("2026-09-01T14:00:00Z"), // 오늘(같은 날) 23:00 KST
-  "#13 22:59 → 오늘 23:00",
+  "#13 22:59/23:00 → 오늘",
 );
 assert.equal(
-  bedtimeMsOf(Date.parse("2026-09-01T14:00:00Z")), // 23:00 KST 정각
+  bedtimeMsOf(Date.parse("2026-09-01T14:00:00Z"), "23:00"), // 23:00 KST 정각
   Date.parse("2026-09-02T14:00:00Z"), // 내일 23:00 KST
-  "#13 23:00 → 내일 23:00",
+  "#13 23:00/23:00 → 내일",
 );
 assert.equal(
-  bedtimeMsOf(Date.parse("2026-09-01T14:20:00Z")), // 23:20 KST
-  Date.parse("2026-09-02T14:00:00Z"), // 내일 23:00 KST
-  "#13 23:20 → 내일 23:00",
-);
-assert.equal(
-  bedtimeMsOf(Date.parse("2026-09-01T15:30:00Z")), // 다음날 00:30 KST(자정 막 넘김)
+  bedtimeMsOf(Date.parse("2026-09-01T15:30:00Z"), "23:00"), // 다음날 00:30 KST(자정 막 넘김)
   Date.parse("2026-09-02T14:00:00Z"), // 그날(같은 KST 날짜) 23:00 — +1일을 또 더하면 안 된다
-  "#13 00:30 → 그날 23:00",
+  "#13 00:30/23:00 → 그날",
 );
+assert.equal(
+  bedtimeMsOf(Date.parse("2026-09-01T06:00:00Z"), "01:30"), // 15:00 KST, 취침 01:30(자정 넘는 값)
+  Date.parse("2026-09-01T16:30:00Z"), // 내일 01:30 KST — 특례 분기 없이 규칙 하나로 나와야 한다
+  "#13 15:00/01:30 → 내일 01:30",
+);
+
+// 성질: bedtime을 5분 간격 288개(00:00~23:55) 전부 넣어도 now < 결과 <= now + 24h 안에 있다.
+const PROPERTY_NOW = Date.parse("2026-09-01T00:00:00Z");
+for (let i = 0; i < 288; i += 1) {
+  const totalMin = i * 5;
+  const bt = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+  const result = bedtimeMsOf(PROPERTY_NOW, bt);
+  assert.ok(
+    result > PROPERTY_NOW && result <= PROPERTY_NOW + 24 * HOUR_MS,
+    `#13 성질: bedtime=${bt} → now < 결과 <= now+24h 위반(${result})`,
+  );
+}
 
 console.log("check:core 전부 통과 (assert 1~13)");
