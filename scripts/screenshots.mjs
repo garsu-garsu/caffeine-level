@@ -53,26 +53,9 @@ async function backdateDrinks(page, minutesAgo) {
   await page.reload({ waitUntil: "networkidle" });
 }
 
-const browser = await chromium.launch();
-const errors = [];
-let n = 0;
-
-for (const { label, fixedMs } of SCENARIOS) {
-  const ctx = await browser.newContext({
-    viewport: { width: 390, height: 844 },
-    deviceScaleFactor: 2,
-    isMobile: true,
-    hasTouch: true,
-  });
-  const page = await ctx.newPage();
-  page.on("pageerror", (err) => errors.push(`[${label}] ${err}`));
-  page.on("console", (msg) => {
-    if (msg.type() === "error" && !msg.text().includes("getSafeAreaInsets")) {
-      errors.push(`[${label}] console.error: ${msg.text()}`);
-    }
-  });
-
-  // @apps-in-toss/devtools 플로팅 버튼(AIT)은 개발 편의용이라 스토어 스크린샷에 찍히면 안 된다.
+/** devtools 플로팅 버튼 숨김 + 시계 고정(경과시간은 흐르게) — QA/스토어 캡처 공용. */
+async function installPageOverrides(page, fixedMs) {
+  // @apps-in-toss/devtools 플로팅 버튼(AIT)은 개발 편의용이라 스크린샷에 찍히면 안 된다.
   // 매 goto/reload마다 다시 그려지므로 addInitScript로 넣어야 계속 숨는다.
   await page.addInitScript(() => {
     document.addEventListener("DOMContentLoaded", () => {
@@ -99,6 +82,28 @@ for (const { label, fixedMs } of SCENARIOS) {
     // @ts-expect-error 브라우저 컨텍스트 오버라이드
     window.Date = FixedDate;
   }, fixedMs);
+}
+
+const browser = await chromium.launch();
+const errors = [];
+let n = 0;
+
+for (const { label, fixedMs } of SCENARIOS) {
+  const ctx = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const page = await ctx.newPage();
+  page.on("pageerror", (err) => errors.push(`[${label}] ${err}`));
+  page.on("console", (msg) => {
+    if (msg.type() === "error" && !msg.text().includes("getSafeAreaInsets")) {
+      errors.push(`[${label}] console.error: ${msg.text()}`);
+    }
+  });
+
+  await installPageOverrides(page, fixedMs);
 
   async function shot(name) {
     n += 1;
@@ -162,9 +167,71 @@ for (const { label, fixedMs } of SCENARIOS) {
   await ctx.close();
 }
 
+// ---- 제출용 스토어 스크린샷 — 콘솔 규격 636×1048, deviceScaleFactor 1, 뷰포트 캡처(리사이징 불가) ----
+{
+  const STORE_OUT = "submission/store-shots";
+  mkdirSync(STORE_OUT, { recursive: true });
+  const fixedMs = kstTodayAt(13, 33); // day 시나리오와 동일 시각·조건
+  const ctx = await browser.newContext({ viewport: { width: 636, height: 1048 }, deviceScaleFactor: 1 });
+  const page = await ctx.newPage();
+  page.on("pageerror", (err) => errors.push(`[store] ${err}`));
+  page.on("console", (msg) => {
+    if (msg.type() === "error" && !msg.text().includes("getSafeAreaInsets")) errors.push(`[store] console.error: ${msg.text()}`);
+  });
+  await installPageOverrides(page, fixedMs);
+
+  async function shot(file) {
+    await page.waitForTimeout(450);
+    await page.screenshot({ path: `${STORE_OUT}/${file}`, fullPage: false });
+    console.log("📸", `${STORE_OUT}/${file}`);
+  }
+
+  await page.goto(BASE, { waitUntil: "networkidle" });
+  await page.getByRole("button", { name: /마셨어요, 기록하기/ }).click();
+  await page.waitForTimeout(300);
+  await page.getByRole("button", { name: /아메리카노 톨/ }).first().click();
+  await page.waitForTimeout(300);
+  await backdateDrinks(page, BACKDATE_MIN);
+  const later = page.getByRole("button", { name: "나중에" });
+  if (await later.count()) {
+    await later.click();
+    await page.waitForTimeout(200);
+  }
+  await page.getByRole("button", { name: "미리보기" }).click();
+  await page.waitForTimeout(200);
+  await page.getByText("아메리카노 톨 150mg", { exact: false }).first().click();
+  await page.waitForTimeout(200);
+  await assertMockup(page, "store");
+  await shot("01-홈-시뮬레이션.png");
+
+  await page.getByRole("button", { name: /마셨어요, 기록하기/ }).click();
+  await page.waitForTimeout(300);
+  await shot("02-기록시트.png");
+
+  await page.goto(BASE, { waitUntil: "networkidle" });
+  await page.waitForTimeout(200);
+  await page.getByText("내 몸에 맞추기", { exact: false }).first().click();
+  await page.waitForTimeout(300);
+  await shot("03-내몸에맞추기.png");
+
+  await page.goto(BASE, { waitUntil: "networkidle" });
+  await page.waitForTimeout(200);
+  await page.getByRole("button", { name: "알림 설정" }).click();
+  await page.waitForTimeout(300);
+  await shot("04-알림.png");
+
+  await page.goto(BASE, { waitUntil: "networkidle" });
+  await page.waitForTimeout(200);
+  await page.getByText("안내", { exact: true }).first().click();
+  await page.waitForTimeout(300);
+  await shot("05-안내.png");
+
+  await ctx.close();
+}
+
 await browser.close();
 
-console.log(`\n✅ 완료: ${n}장 → ${OUT}/ (day/night 두 시나리오)`);
+console.log(`\n✅ 완료: QA ${n}장 → ${OUT}/ (day/night) + 스토어 5장 → submission/store-shots/`);
 if (errors.length > 0) {
   console.error(`\n❌ 콘솔 에러 ${errors.length}건:`);
   for (const e of errors) console.error(" -", e);
