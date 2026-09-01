@@ -3,7 +3,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_BEDTIME = "23:00";
 const BEDTIME_RE = /^([01]\d|2[0-3]):([0-5]\d)$/;
 
-/** "HH:MM" 정규화 — 형식이 안 맞으면 기본값. 옛 저장값·손상된 값 경로를 막는다(normalizeWeightKg와 같은 이유). */
+/** "HH:MM" 정규화 — 형식이 안 맞으면 기본값. 옛 저장값·손상된 값 경로를 막는다(normalizeWeightKg와 같은 이유).
+ * 21:00~02:00 범위는 강제하지 않는다 — <input type="time">의 min/max는 입력을 막아주지 않을 수 있고,
+ * 취침 시각은 계산 기준점일 뿐이라 범위 밖 값(예: 05:00)이 와도 수식은 그대로 성립한다. */
 export function normalizeBedtime(input: unknown): string {
   return typeof input === "string" && BEDTIME_RE.test(input) ? input : DEFAULT_BEDTIME;
 }
