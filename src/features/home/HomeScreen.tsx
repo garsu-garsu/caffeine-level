@@ -10,26 +10,18 @@ import {
   type Drink,
   type Profile,
 } from "../../lib/caffeine";
+import { bedtimeMsOf } from "../../lib/bedtime";
 import { toKstDateKey } from "../../lib/dateKey";
 import { EVENT, track } from "../../lib/analytics";
+import { formatMgL } from "../../lib/format";
 import { SLOTS, requestNotifyConsent } from "../../lib/notify";
 import type { NotifyState } from "../../lib/storage";
 import { BannerAd } from "../../components/BannerAd";
 import { Card, ScreenScroll } from "../../components/ScreenLayout";
-import { CoffeeCup } from "../../components/CoffeeCup";
+import { IvBag } from "../../components/IvBag";
 import { CurveChart } from "../../components/CurveChart";
 import { palette } from "../../theme";
 import { RecordSheet } from "./RecordSheet";
-
-const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
-/** 오늘(KST) 23:00에 해당하는 실제(UTC) ms — 취침 예상은 이 값 고정(§1). */
-function bedtimeMsOf(nowMs: number): number {
-  const kst = new Date(nowMs + KST_OFFSET_MS);
-  const y = kst.getUTCFullYear();
-  const m = kst.getUTCMonth();
-  const d = kst.getUTCDate();
-  return Date.UTC(y, m, d, 23, 0, 0) - KST_OFFSET_MS;
-}
 
 const TOP5_CHIPS: (keyof typeof PRESETS)[] = [
   "americano_tall",
@@ -79,7 +71,7 @@ export function HomeScreen({
   const currentConc = concentrationMgL(drinks, profile, now);
   const currentRemain = remainingMg(currentConc, profile.weightKg);
   const bedtimeMs = bedtimeMsOf(now);
-  const bedtimePassed = now > bedtimeMs;
+  const bedtimeIsTomorrow = toKstDateKey(bedtimeMs) !== toKstDateKey(now);
   // curvePoints로 통일(check-core.ts #12가 실제·시뮬 양쪽을 이 경로로 검증한다 — N-8).
   const bedtimeConc = curvePoints(drinks, profile, bedtimeMs, bedtimeMs, 1)[0].mgL;
   const bedtimeRemain = remainingMg(bedtimeConc, profile.weightKg);
@@ -151,17 +143,17 @@ export function HomeScreen({
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16 }}>
           <div>
             <p style={{ margin: 0, fontSize: 60, fontWeight: 800, color: palette.brown, lineHeight: 1 }}>
-              {currentConc.toFixed(1)} <span style={{ fontSize: 24 }}>mg/L</span>
+              {formatMgL(currentConc)} <span style={{ fontSize: 24 }}>mg/L</span>
             </p>
             <p style={{ margin: "6px 0 0", fontSize: 15, color: palette.sub }}>잔량 약 {Math.round(currentRemain)}mg</p>
           </div>
-          <CoffeeCup remainingMg={currentRemain} />
+          <IvBag remainingMg={currentRemain} />
         </div>
 
         <Card style={{ marginBottom: 20 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <span style={{ fontSize: 15, fontWeight: 700, color: palette.ink }}>
-              {curveRange === "9h" ? "곡선(−3h~+6h)" : "곡선(24시간)"}
+              {curveRange === "9h" ? "최근 3시간~앞으로 6시간" : "곡선(24시간)"}
             </span>
             <TextButton
               size="small"
@@ -187,7 +179,7 @@ export function HomeScreen({
             bedtimeMgL={bedtimeConc}
             bedtimeRemainMg={bedtimeRemain}
             empty={drinks.length === 0}
-            bedtimePassed={bedtimePassed}
+            bedtimeIsTomorrow={bedtimeIsTomorrow}
           />
         </Card>
 
@@ -228,19 +220,13 @@ export function HomeScreen({
         )}
 
         <div style={{ margin: "16px 0" }}>
-          {bedtimePassed ? (
-            <p style={{ margin: 0, fontSize: 15, color: palette.sub }}>오늘 취침 시각(23:00)은 지났어요.</p>
-          ) : (
-            <>
-              <p style={{ margin: 0, fontSize: 15, color: palette.ink }}>
-                🌙 취침(23:00) 예상 {bedtimeConc.toFixed(1)} mg/L (약 {Math.round(bedtimeRemain)}mg)
-              </p>
-              {simOn && simBedtimeConc != null && simBedtimeRemain != null && (
-                <p style={{ margin: "4px 0 0", fontSize: 15, color: palette.ink }}>
-                  한 잔 더 마시면 → {simBedtimeConc.toFixed(1)} mg/L (약 {Math.round(simBedtimeRemain)}mg)
-                </p>
-              )}
-            </>
+          <p style={{ margin: 0, fontSize: 15, color: palette.ink }}>
+            🌙 {bedtimeIsTomorrow ? "내일 " : ""}취침(23:00) 예상 {formatMgL(bedtimeConc)} mg/L (약 {Math.round(bedtimeRemain)}mg)
+          </p>
+          {simOn && simBedtimeConc != null && simBedtimeRemain != null && (
+            <p style={{ margin: "4px 0 0", fontSize: 15, color: palette.ink }}>
+              한 잔 더 마시면 → {formatMgL(simBedtimeConc)} mg/L (약 {Math.round(simBedtimeRemain)}mg)
+            </p>
           )}
         </div>
 

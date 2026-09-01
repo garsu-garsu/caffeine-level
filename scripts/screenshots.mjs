@@ -17,10 +17,25 @@ function kstTodayAt(hour, minute) {
 }
 
 const SCENARIOS = [
-  // 오전 11시 — 취침 23:00이 24h 뷰(±12h) 안·기본 뷰(+6h) 밖이라 화살표 인디케이터 경로도 검증된다.
-  { label: "day", fixedMs: kstTodayAt(11, 0) },
+  // 오후 1시 33분 — 섭취(백데이트 40분 전) 12:53부터 취침 23:00까지 10.117h, 기획.md §0
+  // 목업 세트(취침 0.9/38·시뮬 1.9/79)와 정확히 맞아떨어지는 시각(팀장 검산). 취침은 24h 뷰
+  // (±12h) 안·기본 뷰(+6h) 밖이라 화살표 인디케이터 경로도 계속 검증된다.
+  { label: "day", fixedMs: kstTodayAt(13, 33) },
   { label: "night", fixedMs: kstTodayAt(23, 20) }, // 오후 11시 20분 — 취침 시각 경과 상태(5차 개정)
 ];
+
+// 기획.md §0 단일 출처 목업 세트 — day 촬영 화면이 이 값과 어긋나면 스크립트가 실패해야 한다.
+const MOCKUP = { current: "3.3", remainMg: "137", bedtime: "0.9", bedtimeMg: "38", sim: "1.9", simMg: "79" };
+
+/** 화면 텍스트에 목업 값이 그대로 있는지 확인 — 없으면 촬영 조건이 틀어진 것이다. */
+async function assertMockup(page, label) {
+  const body = await page.textContent("body");
+  for (const [key, value] of Object.entries(MOCKUP)) {
+    if (!body.includes(value)) {
+      throw new Error(`[${label}] 목업 세트 불일치: "${value}"(${key})가 화면에 없다. 기획.md §0 참고.`);
+    }
+  }
+}
 
 // 목업 세트(기획.md §0, 톨 150mg·tmax 38.6분→3.3mg/L·137mg)에 근접하도록 "40분 전"으로 심는다.
 const BACKDATE_MIN = 40;
@@ -118,6 +133,7 @@ for (const { label, fixedMs } of SCENARIOS) {
   await page.getByText("아메리카노 톨 150mg", { exact: false }).first().click();
   await page.waitForTimeout(200);
   await shot("home-sim-chip");
+  if (label === "day") await assertMockup(page, label); // night 목업(0.13/0.26)은 별개라 day만 검사
 
   await page.getByRole("button", { name: "24시간 보기" }).click();
   await page.waitForTimeout(200);

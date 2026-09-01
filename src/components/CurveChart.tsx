@@ -1,4 +1,5 @@
 import type { CurvePoint } from "../lib/caffeine";
+import { formatMgL } from "../lib/format";
 import { palette } from "../theme";
 
 const W = 360;
@@ -26,8 +27,8 @@ export interface CurveChartProps {
   bedtimeMgL: number;
   bedtimeRemainMg: number;
   empty: boolean;
-  /** 오늘 23:00이 이미 지남 — 취침 시각선·🌙 라벨·화살표를 아예 안 그린다(§1 상태표). */
-  bedtimePassed: boolean;
+  /** 오늘 23:00이 이미 지나 다음 취침이 내일 23:00으로 넘어감(§1 상태표 (b)안) — 라벨에 "내일"을 박는다. */
+  bedtimeIsTomorrow: boolean;
 }
 
 /** 곡선 차트 — 화면설계.md §6. 차트 라이브러리 없이 인라인 SVG(기획.md §12.5). */
@@ -44,18 +45,17 @@ export function CurveChart({
   bedtimeMgL,
   bedtimeRemainMg,
   empty,
-  bedtimePassed,
+  bedtimeIsTomorrow,
 }: CurveChartProps) {
   const yMax = Math.max(...points.map((p) => p.mgL), ...(simPoints ?? []).map((p) => p.mgL), 0.001) * 1.2;
   const mapX = (t: number) => LEFT + ((t - fromMs) / (toMs - fromMs)) * (RIGHT - LEFT);
   const mapY = (v: number) => BOTTOM - (v / yMax) * (BOTTOM - TOP);
 
-  const bedtimeInRange = !bedtimePassed && bedtimeMs >= fromMs && bedtimeMs <= toMs;
+  const bedtimeInRange = bedtimeMs >= fromMs && bedtimeMs <= toMs;
+  const bedtimeWord = bedtimeIsTomorrow ? "내일 취침" : "취침";
   const rangePrefix =
     range === "9h" ? "지금부터 3시간 전, 6시간 후까지의" : "지금부터 12시간 전후의";
-  const ariaLabel = bedtimePassed
-    ? `${rangePrefix} 혈중 카페인 농도 곡선. 지금 ${currentMgL.toFixed(1)}mg/L. 오늘 취침 시각(23:00)은 지났어요.`
-    : `${rangePrefix} 혈중 카페인 농도 곡선. 지금 ${currentMgL.toFixed(1)}mg/L, 취침 시 예상 ${bedtimeMgL.toFixed(1)}mg/L(약 ${Math.round(bedtimeRemainMg)}mg)`;
+  const ariaLabel = `${rangePrefix} 혈중 카페인 농도 곡선. 지금 ${formatMgL(currentMgL)}mg/L, ${bedtimeWord} 시 예상 ${formatMgL(bedtimeMgL)}mg/L(약 ${Math.round(bedtimeRemainMg)}mg)`;
 
   const xLabels =
     range === "9h"
@@ -138,35 +138,35 @@ export function CurveChart({
           </>
         )}
 
-        {/* 취침 시각선 / 범위 밖 화살표 인디케이터 — 23:00이 이미 지났으면 아예 안 그린다(§1 상태표) */}
-        {!bedtimePassed &&
-          (bedtimeInRange ? (
-            <>
-              <line
-                x1={mapX(bedtimeMs)}
-                y1={TOP}
-                x2={mapX(bedtimeMs)}
-                y2={BOTTOM}
-                stroke="#8B8478"
-                strokeWidth={1.5}
-                strokeDasharray="4 3"
-              />
-              {/* textAnchor="middle"라 라벨이 차트 오른쪽 끝에 걸리면 잘려 보인다 — x를 클램프한다 */}
-              <text
-                x={Math.min(Math.max(mapX(bedtimeMs), LEFT + 35), RIGHT - 35)}
-                y={TOP - 6}
-                textAnchor="middle"
-                fontSize={11}
-                fill="#8B8478"
-              >
-                🌙 취침 23:00
-              </text>
-            </>
-          ) : (
-            <text x={RIGHT} y={TOP - 6} textAnchor="end" fontSize={11} fill="#8B8478">
-              취침 23:00 →
+        {/* 취침 시각선 / 범위 밖 화살표 인디케이터 */}
+        {bedtimeInRange ? (
+          <>
+            <line
+              x1={mapX(bedtimeMs)}
+              y1={TOP}
+              x2={mapX(bedtimeMs)}
+              y2={BOTTOM}
+              stroke="#8B8478"
+              strokeWidth={1.5}
+              strokeDasharray="4 3"
+            />
+            {/* textAnchor="middle"라 오른쪽 끝에 걸리면 잘리므로 x를 클램프하고,
+                "지금" 마커와 가까우면(N-7) 8px 더 위로 오프셋해 겹침을 피한다 */}
+            <text
+              x={Math.min(Math.max(mapX(bedtimeMs), LEFT + 35), RIGHT - 35)}
+              y={Math.abs(mapX(bedtimeMs) - mapX(nowMs)) < 40 ? TOP - 14 : TOP - 6}
+              textAnchor="middle"
+              fontSize={11}
+              fill="#8B8478"
+            >
+              🌙 {bedtimeWord} 23:00
             </text>
-          ))}
+          </>
+        ) : (
+          <text x={RIGHT} y={TOP - 6} textAnchor="end" fontSize={11} fill="#8B8478">
+            {bedtimeWord} 23:00 →
+          </text>
+        )}
       </svg>
     </div>
   );

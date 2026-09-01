@@ -18,6 +18,7 @@ import {
   type Drink,
   type Profile,
 } from "../src/lib/caffeine.ts";
+import { bedtimeMsOf } from "../src/lib/bedtime.ts";
 import { toKstDateKey } from "../src/lib/dateKey.ts";
 
 function assertClose(got: number, want: number, tol: number, label: string): void {
@@ -176,4 +177,26 @@ assert.ok(
   `#12 시뮬레이션 취침값(${simBedtime})은 실제 취침값(${realBedtime}) × 2 초과여야 한다 — 섭취 시각이 달라 정확히 2배는 구조적으로 불가능하다("2배" 지름길이면 여기서 깨진다)`,
 );
 
-console.log("check:core 전부 통과 (assert 1~12)");
+/* #13 — §12.8 신설(취침 경과 (b)안). 하루 어긋나면 화면값이 조용히 24배 틀린다. */
+assert.equal(
+  bedtimeMsOf(Date.parse("2026-09-01T13:59:00Z")), // 22:59 KST
+  Date.parse("2026-09-01T14:00:00Z"), // 오늘(같은 날) 23:00 KST
+  "#13 22:59 → 오늘 23:00",
+);
+assert.equal(
+  bedtimeMsOf(Date.parse("2026-09-01T14:00:00Z")), // 23:00 KST 정각
+  Date.parse("2026-09-02T14:00:00Z"), // 내일 23:00 KST
+  "#13 23:00 → 내일 23:00",
+);
+assert.equal(
+  bedtimeMsOf(Date.parse("2026-09-01T14:20:00Z")), // 23:20 KST
+  Date.parse("2026-09-02T14:00:00Z"), // 내일 23:00 KST
+  "#13 23:20 → 내일 23:00",
+);
+assert.equal(
+  bedtimeMsOf(Date.parse("2026-09-01T15:30:00Z")), // 다음날 00:30 KST(자정 막 넘김)
+  Date.parse("2026-09-02T14:00:00Z"), // 그날(같은 KST 날짜) 23:00 — +1일을 또 더하면 안 된다
+  "#13 00:30 → 그날 23:00",
+);
+
+console.log("check:core 전부 통과 (assert 1~13)");
