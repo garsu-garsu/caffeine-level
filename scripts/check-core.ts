@@ -1,0 +1,179 @@
+/**
+ * `npm run check:core` — 계산 모델이 깨지면 여기서 터진다.
+ * localStorage·DOM·SDK 없이 `lib/caffeine.ts`·`lib/dateKey.ts` 의 순수 함수만 검증한다.
+ * 기준값 출처: 기획.md §12.8(자가검증 11개) + 심사-2차.md N-2(자가검증 #12, 선형 중첩을
+ * "2배"로 오해하는 구현을 막는다).
+ */
+import assert from "node:assert/strict";
+
+import {
+  PRESETS,
+  concentrationMgL,
+  curvePoints,
+  halfLifeHours,
+  normalizeWeightKg,
+  remainingMg,
+  tmaxHours,
+  todayTotalMg,
+  type Drink,
+  type Profile,
+} from "../src/lib/caffeine.ts";
+import { toKstDateKey } from "../src/lib/dateKey.ts";
+
+function assertClose(got: number, want: number, tol: number, label: string): void {
+  assert.ok(
+    Math.abs(got - want) <= tol,
+    `${label}: ${got} !== ${want} (오차 허용 ±${tol})`,
+  );
+}
+
+const BASE_PROFILE: Profile = { weightKg: 70, smoker: false, oc: false };
+const HOUR_MS = 3_600_000;
+
+function drink(mg: number, atMs: number, preset = "americano_tall"): Drink {
+  return { id: String(atMs), at: atMs, mg, preset };
+}
+
+/* 1·2·3·6·7 — 기준 케이스: 70kg 성인, 아메리카노 톨 150mg, 반감기 5.0h, ka 6/h */
+const t0 = 0;
+const oneDrink = [drink(150, t0)];
+const halfLifeH = halfLifeHours(BASE_PROFILE); // 5.0
+const tmaxH = tmaxHours(halfLifeH);
+const tmaxMin = tmaxH * 60;
+
+// #1 최고점 시각
+assert.ok(tmaxMin >= 30 && tmaxMin <= 45, `tmax(${tmaxMin}분)이 문헌 범위(30~45분) 밖`);
+assertClose(tmaxMin, 38.6, 0.1, "#1 tmax");
+
+// #2 최고 농도
+const cmax = concentrationMgL(oneDrink, BASE_PROFILE, tmaxH * HOUR_MS);
+assert.ok(cmax >= 2.5 && cmax <= 4.5, `Cmax(${cmax})가 문헌 범위(2.5~4.5) 밖`);
+assertClose(cmax, 3.27, 0.01, "#2 Cmax");
+
+// #3 말기 반감 — 5시간마다 정확히 절반
+const c6 = concentrationMgL(oneDrink, BASE_PROFILE, 6 * HOUR_MS);
+const c11 = concentrationMgL(oneDrink, BASE_PROFILE, 11 * HOUR_MS);
+assertClose(c11 / c6, 0.5, 0.001, "#3 C(11h)/C(6h)");
+
+// #4 선형 중첩
+const sameTimeTwo = [drink(150, t0), drink(150, t0)];
+const c1 = concentrationMgL(oneDrink, BASE_PROFILE, tmaxH * HOUR_MS);
+const c2Same = concentrationMgL(sameTimeTwo, BASE_PROFILE, tmaxH * HOUR_MS);
+assertClose(c2Same, c1 * 2, 1e-9, "#4 같은 시각 2잔 === 1잔 × 2");
+
+const drinkA = drink(150, 0);
+const drinkB = drink(100, 3 * HOUR_MS);
+const evalAt = 5 * HOUR_MS;
+const combined = concentrationMgL([drinkA, drinkB], BASE_PROFILE, evalAt);
+const separateSum =
+  concentrationMgL([drinkA], BASE_PROFILE, evalAt) + concentrationMgL([drinkB], BASE_PROFILE, evalAt);
+assertClose(combined, separateSum, 1e-9, "#4 다른 시각 섭취 = 각 잔의 합");
+
+// #5 반감기 분기 — 배타 규칙. 곱셈으로 되돌리면 여기서 깨진다.
+assert.equal(halfLifeHours({ smoker: true, oc: false }), 3.0, "#5 흡연 → 3.0h");
+assert.equal(halfLifeHours({ smoker: false, oc: true }), 7.5, "#5 경구피임약 → 7.5h");
+assert.equal(halfLifeHours({ smoker: true, oc: true }), 3.0, "#5 흡연+경구피임약 → 3.0h(흡연 우선, 곱 아님)");
+assert.equal(halfLifeHours({ smoker: false, oc: false }), 5.0, "#5 둘 다 아님 → 5.0h");
+
+// #6 세 반감기 모두 tmax 정상
+const tmaxExpectMin: [number, number][] = [
+  [3.0, 33.9],
+  [5.0, 38.6],
+  [7.5, 42.4],
+];
+for (const [hl, wantMin] of tmaxExpectMin) {
+  const min = tmaxHours(hl) * 60;
+  assert.ok(min >= 30 && min <= 45, `#6 반감기 ${hl}h의 tmax(${min}분)가 문헌 범위 밖`);
+  assertClose(min, wantMin, 0.1, `#6 반감기 ${hl}h tmax`);
+}
+
+// #7 잔량 병기 — mg/L 옆 잔량 mg이 같은 값에서 유도되는지
+const remainAtCmax = remainingMg(cmax, BASE_PROFILE.weightKg);
+assertClose(remainAtCmax, 137.2, 0.1, "#7 잔량(tmax 시점)");
+assertClose(remainAtCmax, cmax * 0.6 * BASE_PROFILE.weightKg, 1e-9, "#7 잔량 = C(t) × 0.6 × 체중");
+
+// #8 오늘 섭취 합계 — 리셋은 상태가 아니라 필터다(§12.4)
+// KST 자정 = UTC 15:00. 자정 직전(어제)·직후(오늘) 기록을 섞는다.
+const kstMidnightUtcMs = Date.parse("2026-08-30T15:00:00Z"); // = 2026-08-31 00:00 KST
+const drinksAroundMidnight: Drink[] = [
+  drink(200, kstMidnightUtcMs - 60_000, "americano_tall"), // 어제 23:59 KST — 오늘 합계와 다른 값이어야 필터 반전을 잡는다
+  drink(75, kstMidnightUtcMs, "espresso"), // 오늘 00:00 KST
+  drink(75, kstMidnightUtcMs + 60_000, "espresso"), // 오늘 00:01 KST
+];
+const todayTotal = todayTotalMg(drinksAroundMidnight, kstMidnightUtcMs + 60_000, toKstDateKey);
+assert.equal(todayTotal, 150, "#8 오늘 섭취 합계는 KST 날짜 키가 같은 기록만 더한다");
+
+// #9 곡선 좌표 — step 10분(N-5, 기본 뷰와 동일 간격)
+const points = curvePoints(oneDrink, BASE_PROFILE, -3 * HOUR_MS, 6 * HOUR_MS, 10);
+assert.equal(points.length, (9 * 60) / 10 + 1, "#9 곡선 좌표 개수 = (범위분/step)+1");
+assert.ok(
+  points.every((p) => p.mgL >= 0),
+  "#9 모든 mgL >= 0",
+);
+const finePoints = curvePoints(oneDrink, BASE_PROFILE, -1 * HOUR_MS, 10 * HOUR_MS, 1);
+let turns = 0;
+for (let i = 1; i < finePoints.length - 1; i += 1) {
+  const prevUp = finePoints[i].mgL > finePoints[i - 1].mgL;
+  const nextUp = finePoints[i + 1].mgL > finePoints[i].mgL;
+  if (prevUp && !nextUp) turns += 1;
+}
+assert.equal(turns, 1, "#9 단조 구간이 tmax에서 한 번만 뒤집힘");
+
+// #10 프리셋 — 개수 + 11개 전수 대조(§12.1 확정값). 1차·2차 심사에서 연속으로 사고가 난 자리다.
+assert.equal(Object.keys(PRESETS).length, 11, "#10 프리셋은 11개(캔커피 포함, 심사-2차.md A-5 확정)");
+const PRESET_EXPECTED_MG: Record<keyof typeof PRESETS, number> = {
+  espresso: 75,
+  americano_tall: 150,
+  americano_grande: 225,
+  instant_mix: 50,
+  cold_brew: 200,
+  energy_250: 60,
+  energy_355: 100,
+  tonic: 30,
+  green_tea: 22,
+  cola_250: 32,
+  canned_coffee: 88,
+};
+for (const [key, mg] of Object.entries(PRESET_EXPECTED_MG)) {
+  assert.equal(PRESETS[key as keyof typeof PRESETS].mg, mg, `#10 프리셋 ${key} = ${mg}mg`);
+}
+assert.equal(PRESETS.americano_tall.mg, PRESETS.espresso.mg * 2, "#10 아메리카노 톨 = 에스프레소 × 2");
+assert.equal(PRESETS.americano_grande.mg, PRESETS.espresso.mg * 3, "#10 그란데 = 에스프레소 × 3");
+// M-10: 콜드브루 편차 병기(§8-25)가 상수에서 지워지면 여기서 잡힌다.
+assert.ok(PRESETS.cold_brew.note, "#10 콜드브루는 편차 큼 문구를 병기해야 한다(§8-25)");
+assert.equal(PRESETS.tonic.label, "자양강장제", "#10 tonic 화면 라벨은 브랜드명이 아닌 '자양강장제'");
+
+// #11 체중 경계값 — A-10. 화면이 아니라 계산 함수 진입부에서 막는다.
+const weird: unknown[] = [0, -5, "", "abc", NaN, Infinity, null];
+for (const w of weird) {
+  const n = normalizeWeightKg(w);
+  assert.ok(Number.isFinite(n) && n > 0, `#11 체중 입력 ${String(w)} → ${n}은 유한·양수여야 한다`);
+}
+const weightDefault = normalizeWeightKg(70);
+assert.equal(normalizeWeightKg(0), weightDefault, "#11 체중 0 → 70kg과 동일");
+assert.equal(normalizeWeightKg(""), weightDefault, "#11 체중 '' → 70kg과 동일");
+assert.equal(normalizeWeightKg("abc"), weightDefault, "#11 체중 'abc' → 70kg과 동일");
+assert.equal(normalizeWeightKg(25), 30, "#11 체중 25 → 30kg으로 클램프");
+assert.equal(normalizeWeightKg(500), 200, "#11 체중 500 → 200kg으로 클램프");
+
+/* #12 — 심사-2차.md N-2, ait-cto 확정치. 시뮬레이션 취침값을 "2배"로 계산하는 구현이 들어오면 깨진다.
+ * 회귀 방지선은 부등호(sim > real × 2) 쪽 — 고정값은 기준 케이스 확인용일 뿐이다. */
+const now = tmaxH * HOUR_MS; // 마신 뒤 tmax(38.6분) 시점 — §0 목업 조건
+// 기존 잔만으로 취침(23:00) 예상이 0.9mg/L이 되는 시각 = 마신 뒤 약 10.111h(§12.8 N-2 검산).
+const bedtimeMs = 10.111148511386_27 * HOUR_MS;
+const simDrinks = [...oneDrink, drink(150, now, "americano_tall")]; // curvePoints(drinks.concat([가상 1건]), ...)와 동일한 재호출 패턴
+
+// sim/real 값은 curvePoints() 결과에서 읽는다 — 시뮬 전용 계산 경로가 생기면 여기서도 잡힌다.
+const realBedtime = curvePoints(oneDrink, BASE_PROFILE, bedtimeMs, bedtimeMs, 1)[0].mgL;
+const simBedtime = curvePoints(simDrinks, BASE_PROFILE, bedtimeMs, bedtimeMs, 1)[0].mgL;
+
+assertClose(realBedtime, 0.9, 0.001, "#12 실제 곡선 취침값");
+assertClose(simBedtime, 1.8839, 0.001, "#12 시뮬레이션 취침값");
+assertClose(remainingMg(simBedtime, BASE_PROFILE.weightKg), 79.1, 0.05, "#12 시뮬레이션 취침 잔량");
+assertClose(simBedtime / realBedtime, 2.0932, 0.001, "#12 sim/real 비율");
+assert.ok(
+  simBedtime > realBedtime * 2,
+  `#12 시뮬레이션 취침값(${simBedtime})은 실제 취침값(${realBedtime}) × 2 초과여야 한다 — 섭취 시각이 달라 정확히 2배는 구조적으로 불가능하다("2배" 지름길이면 여기서 깨진다)`,
+);
+
+console.log("check:core 전부 통과 (assert 1~12)");
