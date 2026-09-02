@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { BottomSheet, Button, ListRow, TextButton, TextField } from "@toss/tds-mobile";
+import { BottomSheet, Button, ListRow, TextField } from "@toss/tds-mobile";
 import { adaptive } from "@toss/tds-colors";
 
 import { PRESETS, type Drink, type PresetInfo } from "../../lib/caffeine";
+import { lastOccurrenceMs, toKstHHMM } from "../../lib/bedtime";
 import { palette } from "../../theme";
 
 /** 기록 시트(§2) — 탭 한 번 즉시 기록, 광고·확인 절차 없음(코어 루프 보호). */
@@ -24,14 +25,13 @@ export function RecordSheet({
   onRemove: (id: string) => void;
 }) {
   const [customMg, setCustomMg] = useState("");
-  const [hourOffset, setHourOffset] = useState(0); // 0=지금, 1=1시간 전 ...
-  const [showStepper, setShowStepper] = useState(false);
-  const atMs = nowMs - hourOffset * 3_600_000;
+  // null = 안 건드림 → "지금"(§2 15차). 건드리면 그 시각의 직전 발생(미래 불가)으로 고정된다.
+  const [timeText, setTimeText] = useState<string | null>(null);
+  const atMs = timeText == null ? nowMs : lastOccurrenceMs(nowMs, timeText);
 
   const reset = () => {
     setCustomMg("");
-    setHourOffset(0);
-    setShowStepper(false);
+    setTimeText(null);
   };
 
   return (
@@ -46,6 +46,18 @@ export function RecordSheet({
     >
       {/* 시트 좌우 패딩 20px — 헤더(TDS 기본 여백)와 그리드가 같은 좌측 기준선을 쓰게 한다(§2 13차). */}
       <div style={{ padding: "0 20px 16px" }}>
+      {/* "언제 → 무엇을" — 그리드보다 위(§2 15차). 네이티브(TDS에 시간 컴포넌트 없음, §3와 같은 이유).
+          절대 시각만 표기 — 1시간 스텝 상대 표기는 tmax 38.6분 정밀도를 입력 단계에서 무효화했다. */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 16 }}>
+        <span style={{ fontSize: 15, color: palette.ink }}>마신 시각</span>
+        <input
+          type="time"
+          step={60}
+          value={timeText ?? toKstHHMM(nowMs)}
+          onChange={(e) => setTimeText(e.target.value)}
+          style={{ fontSize: 16, padding: "8px 12px", border: `1px solid ${adaptive.grey200}`, borderRadius: 8 }}
+        />
+      </div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
         {(Object.entries(PRESETS) as [keyof typeof PRESETS, PresetInfo][]).map(
           ([key, preset]) => (
@@ -101,25 +113,6 @@ export function RecordSheet({
         >
           추가
         </Button>
-      </div>
-
-      <div style={{ marginTop: 8, marginBottom: 12 }}>
-        <TextButton size="small" variant="underline" onClick={() => setShowStepper((v) => !v)}>
-          {hourOffset === 0 ? "지금 마셨어요" : `${hourOffset}시간 전`} · 시각 바꾸기
-        </TextButton>
-        {showStepper && (
-          <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 8 }}>
-            <TextButton size="small" onClick={() => setHourOffset((h) => Math.min(h + 1, 12))}>
-              ◀ 더 전으로
-            </TextButton>
-            <span style={{ fontSize: 15, color: palette.ink }}>
-              {hourOffset === 0 ? "지금" : `${hourOffset}시간 전`}
-            </span>
-            <TextButton size="small" onClick={() => setHourOffset((h) => Math.max(h - 1, 0))}>
-              더 나중으로 ▶
-            </TextButton>
-          </div>
-        )}
       </div>
 
       {todayDrinks.length > 0 && (

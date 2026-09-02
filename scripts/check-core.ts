@@ -18,7 +18,7 @@ import {
   type Drink,
   type Profile,
 } from "../src/lib/caffeine.ts";
-import { bedtimeMsOf } from "../src/lib/bedtime.ts";
+import { bedtimeMsOf, lastOccurrenceMs } from "../src/lib/bedtime.ts";
 import { toKstDateKey } from "../src/lib/dateKey.ts";
 
 function assertClose(got: number, want: number, tol: number, label: string): void {
@@ -215,4 +215,29 @@ for (let i = 0; i < 288; i += 1) {
   );
 }
 
-console.log("check:core 전부 통과 (assert 1~13)");
+/* #14 — §12.8 신설(기록 시각 입력, 15차). 마신 시각은 미래일 수 없다 — bedtimeMsOf와 방향이
+ * 정반대다. 부호만 안 뒤집는 게 실제 사고 유형이라 두 함수가 같은 입력에서 같은 값을 내면 안 된다. */
+const NOW_1400 = Date.parse("2026-09-01T05:00:00Z"); // 14:00 KST
+assert.equal(lastOccurrenceMs(NOW_1400, "09:20"), Date.parse("2026-09-01T00:20:00Z"), "#14 14:00/09:20 → 오늘");
+assert.equal(lastOccurrenceMs(NOW_1400, "23:30"), Date.parse("2026-08-31T14:30:00Z"), "#14 14:00/23:30 → 어제");
+assert.equal(lastOccurrenceMs(NOW_1400, "14:00"), NOW_1400, "#14 14:00/14:00 → 오늘");
+assert.equal(lastOccurrenceMs(NOW_1400, "14:01"), Date.parse("2026-08-31T05:01:00Z"), "#14 14:00/14:01 → 어제");
+assert.equal(lastOccurrenceMs(NOW_1400, "abc"), NOW_1400, "#14 깨진 입력 → now");
+assert.notEqual(
+  bedtimeMsOf(NOW_1400, "09:20"),
+  lastOccurrenceMs(NOW_1400, "09:20"),
+  "#14 bedtimeMsOf와 lastOccurrenceMs는 같은 입력에서 같은 값을 내면 안 된다(방향 반대 확인)",
+);
+
+// 성질: 임의 now × HH:MM 288개 전부 now - 24h < 결과 <= now.
+for (let i = 0; i < 288; i += 1) {
+  const totalMin = i * 5;
+  const hhmm = `${String(Math.floor(totalMin / 60)).padStart(2, "0")}:${String(totalMin % 60).padStart(2, "0")}`;
+  const result = lastOccurrenceMs(PROPERTY_NOW, hhmm);
+  assert.ok(
+    result > PROPERTY_NOW - 24 * HOUR_MS && result <= PROPERTY_NOW,
+    `#14 성질: hhmm=${hhmm} → now-24h < 결과 <= now 위반(${result})`,
+  );
+}
+
+console.log("check:core 전부 통과 (assert 1~14)");
