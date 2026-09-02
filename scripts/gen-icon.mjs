@@ -29,19 +29,30 @@ mkdirSync(outDir, { recursive: true });
 const FONT = `-apple-system, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif`;
 const esc = (s) => String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
 
-// 테이크아웃 컵 — viewBox 0 0 600 600(§7 컵 아트 스펙 그대로). 얼음·글자·의료 기호 없음.
-function cupSvg(size) {
+// 테이크아웃 컵 — viewBox 0 0 600 600(§7 컵 아트 스펙 좌표 그대로). 얼음·글자·의료 기호 없음.
+// transform이 있으면 컵 전체(clipPath 포함 — clipPathUnits 기본값 userSpaceOnUse라 <g>의
+// 변환을 그대로 물려받는다)를 그 자리에서 확대/이동한다. 썸네일은 transform 없이(원본 그대로) 쓴다.
+function cupSvg(size, transform) {
+  const open = transform ? `<g transform="${transform}">` : "";
+  const close = transform ? "</g>" : "";
   return `<svg width="${size}" height="${size}" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <clipPath id="cupClip"><path d="M160,220 L440,220 L400,480 L200,480 Z" /></clipPath>
   </defs>
+  ${open}
   <path d="M160,220 L440,220 L400,480 L200,480 Z" fill="#FFF8ED" />
   <rect x="160" y="300" width="280" height="180" fill="#3E2117" clip-path="url(#cupClip)" />
   <path d="M160,220 L440,220 L400,480 L200,480 Z" fill="none" stroke="#2B1B0E" stroke-width="8" />
   <rect x="140" y="195" width="320" height="30" rx="6" fill="#FFF8ED" stroke="#2B1B0E" stroke-width="8" />
   <line x1="320" y1="200" x2="365" y2="90" stroke="#2B1B0E" stroke-width="14" stroke-linecap="round" />
+  ${close}
 </svg>`;
 }
+
+// 아이콘 전용 확대 — 원본 컵 바운딩박스(x:140~460, y:90~480)의 폭 320을 프레임(600)의 60%(360)로
+// 키운다(scale=1.125). 빨대 끝(y=90)이 위로 삐져나오니 상단 여백(90px)을 하단(71px)보다 넉넉히 둔다.
+const ICON_CUP_SCALE = 1.125;
+const ICON_CUP_TRANSFORM = `matrix(${ICON_CUP_SCALE},0,0,${ICON_CUP_SCALE},-37.5,-11.25)`;
 
 const iconHTML = `<!doctype html><meta charset="utf-8">
 <style>
@@ -52,7 +63,7 @@ const iconHTML = `<!doctype html><meta charset="utf-8">
         background:radial-gradient(circle,rgba(255,255,255,.28),transparent 60%)}
   .cup{position:relative;filter:drop-shadow(0 12px 30px rgba(0,0,0,.18))}
 </style>
-<div class="box"><div class="glow"></div><div class="cup">${cupSvg(600)}</div></div>`;
+<div class="box"><div class="glow"></div><div class="cup">${cupSvg(600, ICON_CUP_TRANSFORM)}</div></div>`;
 
 const thumbHTML = `<!doctype html><meta charset="utf-8">
 <style>
