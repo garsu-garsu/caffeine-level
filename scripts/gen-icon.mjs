@@ -52,7 +52,7 @@ const iconHTML = `<!doctype html><meta charset="utf-8">
         background:radial-gradient(circle,rgba(255,255,255,.28),transparent 60%)}
   .cup{position:relative;filter:drop-shadow(0 12px 30px rgba(0,0,0,.18))}
 </style>
-<div class="box"><div class="glow"></div><div class="cup">${cupSvg(360)}</div></div>`;
+<div class="box"><div class="glow"></div><div class="cup">${cupSvg(600)}</div></div>`;
 
 const thumbHTML = `<!doctype html><meta charset="utf-8">
 <style>
