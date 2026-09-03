@@ -16,6 +16,7 @@ import {
   tmaxHours,
   todayTotalMg,
   zeroCrossingMs,
+  ZERO_THRESHOLD_MGL,
   type Drink,
   type Profile,
 } from "../src/lib/caffeine.ts";
@@ -276,6 +277,15 @@ for (let h = 1; h <= 72; h += 1) {
   assert.ok(cur <= prev, `#15 여러 잔: 마지막 tmax 이후 단조 감소 위반(h=${h})`);
   prev = cur;
 }
+
+// 이미 임계 밑으로 내려간 뒤(3일 전 1잔)에는 과거 시각이 돌아온다 — 호출부가 이 경우를 걸러야 한다.
+const staleDrinks = [drink(150, -72 * HOUR_MS)];
+const staleZero = zeroCrossingMs(staleDrinks, BASE_PROFILE);
+assert.ok(staleZero != null && staleZero < 0, "#15 이미 지난 경우 zeroCrossingMs는 과거 시각을 돌려준다");
+assert.ok(
+  concentrationMgL(staleDrinks, BASE_PROFILE, 0) < ZERO_THRESHOLD_MGL,
+  "#15 그때 현재 농도는 임계 미만이므로 카운트다운 표시 조건이 거짓이어야 한다",
+);
 
 /* #16 — §12.8 신설. formatRemainingMg가 카운트다운 도중 "0"으로 뭉개지면 안 된다. */
 assert.equal(formatRemainingMg(0.21), "0.2", "#16 formatRemainingMg(0.21)");

@@ -139,7 +139,7 @@ export function curvePoints(
   return points;
 }
 
-const ZERO_THRESHOLD_MGL = 0.005; // formatMgL의 소수 2자리 표기에서 0.00으로 반올림되는 경계
+export const ZERO_THRESHOLD_MGL = 0.005; // formatMgL의 소수 2자리 표기에서 0.00으로 반올림되는 경계
 const ZERO_SEARCH_MAX_MS = 7 * 24 * 3_600_000;
 const ZERO_SEARCH_ITERATIONS = 20; // log2(604800초) ≈ 19.2
 

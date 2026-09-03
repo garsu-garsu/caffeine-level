@@ -8,6 +8,7 @@ import {
   remainingMg,
   todayTotalMg,
   zeroCrossingMs,
+  ZERO_THRESHOLD_MGL,
   type Drink,
   type Profile,
 } from "../../lib/caffeine";
@@ -152,7 +153,7 @@ export function HomeScreen({
               {formatMgL(currentConc)} <span style={{ fontSize: 24 }}>mg/L</span>
             </p>
             <p style={{ margin: "6px 0 0", fontSize: 15, color: palette.sub }}>잔량 약 {formatRemainingMg(currentRemain)}mg</p>
-            {zeroAtMs != null && <Countdown targetMs={zeroAtMs} />}
+            {zeroAtMs != null && currentConc >= ZERO_THRESHOLD_MGL && <Countdown targetMs={zeroAtMs} />}
           </div>
           <IvBag remainingMg={currentRemain} />
         </div>
