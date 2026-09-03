@@ -139,6 +139,33 @@ export function curvePoints(
   return points;
 }
 
+const ZERO_THRESHOLD_MGL = 0.005; // formatMgL의 소수 2자리 표기에서 0.00으로 반올림되는 경계
+const ZERO_SEARCH_MAX_MS = 7 * 24 * 3_600_000;
+const ZERO_SEARCH_ITERATIONS = 20; // log2(604800초) ≈ 19.2
+
+/**
+ * 카페인이 다 빠지는 시각(§0·§1 18~19차) — concentrationMgL이 임계 미만으로 내려가는 첫 시점.
+ * curvePoints(등간격 샘플러)는 초 단위 경계를 못 좁혀 재사용하지 않고 이분 탐색한다.
+ * 탐색 시작점은 "마지막 섭취.at + tmax" — tmax는 반감기만의 함수라 잔이 몇 개든 시작점이 하나고,
+ * 그 시점이면 이미 마신 모든 잔이 각자의 피크를 지나 하강 중이므로 그 뒤로는 단조 감소가 보장된다.
+ * 7일 안에 임계 밑으로 안 내려가거나 기록이 없으면 null.
+ */
+export function zeroCrossingMs(drinks: Drink[], profile: Profile): number | null {
+  if (drinks.length === 0) return null;
+  const halfLifeH = halfLifeHours(profile);
+  const lastAt = Math.max(...drinks.map((d) => d.at));
+  let lo = lastAt + tmaxHours(halfLifeH) * 3_600_000;
+  if (concentrationMgL(drinks, profile, lo) < ZERO_THRESHOLD_MGL) return lo;
+  let hi = lo + ZERO_SEARCH_MAX_MS;
+  if (concentrationMgL(drinks, profile, hi) >= ZERO_THRESHOLD_MGL) return null;
+  for (let i = 0; i < ZERO_SEARCH_ITERATIONS; i += 1) {
+    const mid = (lo + hi) / 2;
+    if (concentrationMgL(drinks, profile, mid) < ZERO_THRESHOLD_MGL) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
 /** 오늘 섭취 합계 — 리셋은 상태가 아니라 필터다(§12.4). KST 날짜 키가 같은 기록만 더한다. */
 export function todayTotalMg(drinks: Drink[], nowMs: number, toKstDateKey: (unixMs: number) => string): number {
   const todayKey = toKstDateKey(nowMs);

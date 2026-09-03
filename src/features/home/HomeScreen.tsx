@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button, ProgressBar, Switch, TextButton, useToast } from "@toss/tds-mobile";
 
 import {
@@ -7,13 +7,15 @@ import {
   curvePoints,
   remainingMg,
   todayTotalMg,
+  zeroCrossingMs,
   type Drink,
   type Profile,
 } from "../../lib/caffeine";
 import { bedtimeMsOf } from "../../lib/bedtime";
 import { toKstDateKey } from "../../lib/dateKey";
 import { EVENT, track } from "../../lib/analytics";
-import { formatMgL } from "../../lib/format";
+import { formatMgL, formatRemainingMg } from "../../lib/format";
+import { Countdown } from "../../components/Countdown";
 import { SLOTS, requestNotifyConsent } from "../../lib/notify";
 import type { NotifyState } from "../../lib/storage";
 import { BannerAd } from "../../components/BannerAd";
@@ -72,6 +74,8 @@ export function HomeScreen({
 
   const currentConc = concentrationMgL(drinks, profile, now);
   const currentRemain = remainingMg(currentConc, profile.weightKg);
+  // drinks·profile이 바뀔 때만 다시 구한다(§0 18~19차) — 1초 카운트다운은 <Countdown>이 따로 돈다.
+  const zeroAtMs = useMemo(() => zeroCrossingMs(drinks, profile), [drinks, profile]);
   const bedtimeMs = bedtimeMsOf(now, bedtime);
   const bedtimeIsTomorrow = toKstDateKey(bedtimeMs) !== toKstDateKey(now);
   // curvePoints로 통일(check-core.ts #12가 실제·시뮬 양쪽을 이 경로로 검증한다 — N-8).
@@ -147,7 +151,8 @@ export function HomeScreen({
             <p style={{ margin: 0, fontSize: 60, fontWeight: 800, color: palette.brown, lineHeight: 1 }}>
               {formatMgL(currentConc)} <span style={{ fontSize: 24 }}>mg/L</span>
             </p>
-            <p style={{ margin: "6px 0 0", fontSize: 15, color: palette.sub }}>잔량 약 {Math.round(currentRemain)}mg</p>
+            <p style={{ margin: "6px 0 0", fontSize: 15, color: palette.sub }}>잔량 약 {formatRemainingMg(currentRemain)}mg</p>
+            {zeroAtMs != null && <Countdown targetMs={zeroAtMs} />}
           </div>
           <IvBag remainingMg={currentRemain} />
         </div>
@@ -224,11 +229,11 @@ export function HomeScreen({
 
         <div style={{ margin: "16px 0" }}>
           <p style={{ margin: 0, fontSize: 15, color: palette.ink }}>
-            🌙 {bedtimeIsTomorrow ? "내일 " : ""}취침({bedtime}) 예상 {formatMgL(bedtimeConc)} mg/L (약 {Math.round(bedtimeRemain)}mg)
+            🌙 {bedtimeIsTomorrow ? "내일 " : ""}취침({bedtime}) 예상 {formatMgL(bedtimeConc)} mg/L (약 {formatRemainingMg(bedtimeRemain)}mg)
           </p>
           {simOn && simBedtimeConc != null && simBedtimeRemain != null && (
             <p style={{ margin: "4px 0 0", fontSize: 15, color: palette.ink }}>
-              한 잔 더 마시면 → {formatMgL(simBedtimeConc)} mg/L (약 {Math.round(simBedtimeRemain)}mg)
+              한 잔 더 마시면 → {formatMgL(simBedtimeConc)} mg/L (약 {formatRemainingMg(simBedtimeRemain)}mg)
             </p>
           )}
         </div>

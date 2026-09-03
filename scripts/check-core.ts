@@ -15,11 +15,13 @@ import {
   remainingMg,
   tmaxHours,
   todayTotalMg,
+  zeroCrossingMs,
   type Drink,
   type Profile,
 } from "../src/lib/caffeine.ts";
 import { bedtimeMsOf, lastOccurrenceMs } from "../src/lib/bedtime.ts";
 import { toKstDateKey } from "../src/lib/dateKey.ts";
+import { formatRemainingMg } from "../src/lib/format.ts";
 
 function assertClose(got: number, want: number, tol: number, label: string): void {
   assert.ok(
@@ -240,4 +242,44 @@ for (let i = 0; i < 288; i += 1) {
   );
 }
 
-console.log("check:core 전부 통과 (assert 1~14)");
+/* #15 — §12.8 신설(카운트다운, 18~19차). 경계 확인: 결과 시점은 임계 미만, 60초 전은 임계 이상. */
+for (const [hl, smoker, oc] of [
+  [3.0, true, false],
+  [5.0, false, false],
+  [7.5, false, true],
+] as [number, boolean, boolean][]) {
+  const profile: Profile = { weightKg: 70, smoker, oc };
+  const zeroAt = zeroCrossingMs(oneDrink, profile);
+  assert.ok(zeroAt != null, `#15 반감기 ${hl}h: 7일 안에 임계 밑으로 내려가야 한다`);
+  const at = zeroAt as number;
+  assertClose(halfLifeHours(profile), hl, 1e-9, `#15 반감기 ${hl}h 분기 확인`);
+  assert.ok(concentrationMgL(oneDrink, BASE_PROFILE, at) >= 0, "#15 결과는 유한값");
+  assert.ok(
+    concentrationMgL(oneDrink, profile, at) < 0.005,
+    `#15 반감기 ${hl}h: 결과 시점 농도는 임계(0.005) 미만이어야 한다`,
+  );
+  assert.ok(
+    concentrationMgL(oneDrink, profile, at - 60_000) >= 0.005,
+    `#15 반감기 ${hl}h: 결과 60초 전은 아직 임계 이상이어야 한다`,
+  );
+  assertClose(remainingMg(concentrationMgL(oneDrink, profile, at), 70), 0.21, 0.01, `#15 반감기 ${hl}h 잔량 ≈0.21mg`);
+}
+
+// 여러 잔(0h·3h·6h 톨 3잔) — 마지막 잔의 tmax 이후로는 단조 감소해야 한다.
+const multiDrinks = [drink(150, 0 * HOUR_MS), drink(150, 3 * HOUR_MS), drink(150, 6 * HOUR_MS)];
+const multiZero = zeroCrossingMs(multiDrinks, BASE_PROFILE);
+assert.ok(multiZero != null, "#15 여러 잔도 7일 안에 임계 밑으로 내려가야 한다");
+const multiStart = 6 * HOUR_MS + tmaxHours(5.0) * HOUR_MS;
+let prev = concentrationMgL(multiDrinks, BASE_PROFILE, multiStart);
+for (let h = 1; h <= 72; h += 1) {
+  const cur = concentrationMgL(multiDrinks, BASE_PROFILE, multiStart + h * HOUR_MS);
+  assert.ok(cur <= prev, `#15 여러 잔: 마지막 tmax 이후 단조 감소 위반(h=${h})`);
+  prev = cur;
+}
+
+/* #16 — §12.8 신설. formatRemainingMg가 카운트다운 도중 "0"으로 뭉개지면 안 된다. */
+assert.equal(formatRemainingMg(0.21), "0.2", "#16 formatRemainingMg(0.21)");
+assert.equal(formatRemainingMg(137.2), "137", "#16 formatRemainingMg(137.2)");
+assert.notEqual(formatRemainingMg(0.21), "0", "#16 카운트다운 도는 동안 잔량이 '0'으로 뭉개지면 안 된다");
+
+console.log("check:core 전부 통과 (assert 1~16)");
